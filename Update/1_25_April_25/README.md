@@ -10,6 +10,7 @@ Single variate analysis done for Region R3T3
 | 13         | R3              | T3            | R3T3             | 9/14/2023   | 48.41                 | 39.11                | 10.29                     | 5.7                  | 9.04                     | 5.58                | 10                           | 14                        | 10             | 1.3       |
 | 13         | R3              | T3            | R3T3             | 9/25/2023   | 39.93                 | 32.76                | 8.7                       | 5.44                 | 9.27                     | 6.22                | 26                           | 30                        | 24             | 9.6       |
 
+Excel sheet [Link](https://docs.google.com/spreadsheets/d/1FoDAVPAykb_LI-4wmYFFPmmTAOIp17HD/edit?usp=sharing&ouid=112257746516387098189&rtpof=true&sd=true)
 ### Trend that is seen from the shared data
 ##### Analysis of the Onion Crop Data:
 ###### Plant Height & Leaf Length:
