@@ -38,19 +38,19 @@ Single variate analysis done for Region R3T3
 
 ### Trend that is seen from the shared data
 ##### Analysis of the Onion Crop Data:
-####### Plant Height & Leaf Length:
+###### Plant Height & Leaf Length:
 
 - There’s a decline in plant height from 52.33 cm on 8/28/2023 to 39.93 cm by 9/25/2023, indicating that the onion plants are experiencing stress.
 
 - Similarly, the leaf length drops from 44.7 cm to 32.76 cm, suggesting reduced growth, likely due to disease or pest pressure.
 
-####### Pseudostem Measurements:
+###### Pseudostem Measurements:
 
 - The pseudostem length initially increases but drops by 9/25/2023. This could be an indication of plant weakness due to stressors like diseases.
 
 - The pseudostem width also decreases, indicating possible structural damage or reduced vigor as the crop matures.
 
-####### Disease Impact (PDI values):
+###### Disease Impact (PDI values):
 
 - Stemphylium Blight increases from 0% to 26%, a clear sign that the disease is progressing and likely contributing to the decline in plant health.
 
@@ -58,9 +58,9 @@ Single variate analysis done for Region R3T3
 
 - Anthracnose (PDI AN) is also noticeable, peaking at 24% by the end of the dataset.
 
-####### Thrips Count:
+###### Thrips Count:
 
 - The thrips population increases from 5.9 on 8/28/2023 to 9.6 on 9/25/2023, further confirming that pests might be contributing to the stress and damage to the leaves.
 
-####### Conclusion:
+###### Conclusion:
 The onion crop appears to be under significant stress as shown by the decline in growth parameters (height, leaf length, pseudostem dimensions) and the increase in disease pressure (especially Stemphylium Blight and Purple Blotch) and thrips population. This combination of factors likely reduces the potential for high yield.
