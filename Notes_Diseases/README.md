@@ -1,4 +1,38 @@
- ###✅Top Vegetation Indices for 5-Band Multispectral Imagery (R, G, B, RE, NIR)**
+### Percent Disease Index (PDI) values of various diseases and pests affecting onion crops, specifically:
+- Stemphylium blight (Stemphylium vesicarium)
+- Purple blotch (Alternaria porri)
+- Anthracnose (Colletotrichum spp.) — possibly what you meant by "anthrax nose"
+- Thrips (Thrips tabaci) — a major insect pest
+
+#### 🧅 Onion Growing Seasons in India (2023)
+
+| Season       | Sowing Time       | Transplanting          | Harvest               |
+|--------------|-------------------|-------------------------|------------------------|
+| Rabi         | Oct–Nov 2022      | Dec 2022–Jan 2023       | March–May 2023         |
+| Kharif       | May–June 2023     | July–Aug 2023           | Sept–Oct 2023          |
+| Late Kharif  | Aug–Sept 2023     | Sept–Oct 2023           | Dec 2023–Jan 2024      |
+
+
+### Onion Disease and Pest Overview
+
+| Disease/Pest       | Causal Agent                  | Symptoms                                       | Favorable Conditions               | Approx. Peak Season   | Common PDI Range (in severe cases)             |
+|--------------------|-------------------------------|------------------------------------------------|------------------------------------|------------------------|------------------------------------------------|
+| Stemphylium Blight | *Stemphylium vesicarium*      | Oval to elongated dark brown lesions on leaves | High humidity, warm temperature    | Post-monsoon           | 30–80%                                         |
+| Purple Blotch      | *Alternaria porri*            | Small water-soaked lesions with purple center  | Humid & warm (24–30°C)             | Monsoon to post         | 20–70%                                         |
+| Anthracnose        | *Colletotrichum gloeosporioides* | Sunken lesions on leaves, neck rot             | High RH (>80%), wet conditions     | Rainy season            | 10–60%                                         |
+| Thrips             | *Thrips tabaci*               | Silvery streaks, curling leaves                | Dry, warm (20–30°C)                | Dry seasons             | Populations > 20–30 thrips/plant               |
+
+### 📅 Disease/Pest Incidence Timelines in 2023
+
+| Disease/Pest       | Peak Risk Period in 2023                   | Notes                                                       |
+|--------------------|---------------------------------------------|-------------------------------------------------------------|
+| Stemphylium blight | March–May (Rabi harvest), Sept–Nov (Late Kharif) | Favors warm days + high RH during leaf maturity             |
+| Purple blotch      | March–April, Aug–Oct                       | Appears post-flowering; worsens with >85% RH                |
+| Anthracnose        | July–Sept (Kharif)                         | Strong during heavy rains, cloudy wet spells                |
+| Thrips             | Feb–April, Oct–Dec                         | Populations rise in dry, warm weather; biggest Rabi pest    |
+
+
+ ### ✅Top Vegetation Indices for 5-Band Multispectral Imagery (R, G, B, RE, NIR)**
 
 | **Index**                             | **Formula**                                         | **Sensitivity**                                  | **Best For**                                      |
 |--------------------------------------|-----------------------------------------------------|--------------------------------------------------|---------------------------------------------------|
@@ -9,7 +43,7 @@
 | **Visible Atmospherically Resistant Index (VARI)** | (G - R) / (G + R - B)                     | Detects greenness from RGB only                  | Thrips, general greenness                         |
 | **Enhanced Vegetation Index 2 (EVI2)**| 2.5 × (NIR - R) / (NIR + 2.4 × R + 1)                | Improved sensitivity in dense vegetation         | Stemphylium, Purple blotch                        |
 
- ###🌿 How Each Index Helps
+ ### 🌿 How Each Index Helps
 1. NDVI
 - Good baseline for disease stress monitoring.
 - Disease lesions and Thrips feeding reduce chlorophyll → lower NDVI.
