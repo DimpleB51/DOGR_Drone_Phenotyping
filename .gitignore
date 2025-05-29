@@ -7,8 +7,5 @@ output*
 *.tif
 *.png
 *sandbox*
-# sandbox.ipynb
-# eda/eda_sandbox.ipynb
-config.py
 mask_me.py
 try.py
