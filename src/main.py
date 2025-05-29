@@ -13,15 +13,6 @@ import sys
 import config as cfg
 import geopandas as gpd
 
-'''
-Currently this file will take a root_folder containing 6 single spectral .tif file
-representing [R, G, B, NIR, RE, PANCHRO]
-and a .json file containing the polygon coordinates
-as input and will create a masked .tif file
-based on the polygon in the .json file
-This new .tif file will have multiple bands representing defferent VIs
-'''
-
 def combine_bands(folder_path):
     all_tif_data = np.empty((6, 0, 0))
     meta = None
@@ -67,7 +58,7 @@ def output_exists(output_dir):
     for files in os.listdir(output_dir):
         if files.endswith('.tif'):
             cnt += 1
-    return cnt >= 15
+    return cnt >= cfg.NUM_OF_REGIONS
 
 def main():
     parser = argparse.ArgumentParser(description="Process TIF files to compute indices and apply mask.")
