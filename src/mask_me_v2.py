@@ -1,22 +1,25 @@
 import numpy as np
 import rasterio
 from rasterio import features
+from rasterio.windows import Window
 from rasterio.mask import mask as rio_mask
 import os
 
+import utils
 import geopandas as gpd
+import config as cfg
 # ********************************************************************
 
-def load_tif_numpy_with_meta(tiff_path):
-    with rasterio.open(tiff_path) as dataset:
-        image_array = dataset.read()    
-        if image_array.ndim == 2:
-            image_array = image_array[np.newaxis, ...]
+# def load_tif_numpy_with_meta(tiff_path):
+#     with rasterio.open(tiff_path) as dataset:
+#         image_array = dataset.read()    
+#         if image_array.ndim == 2:
+#             image_array = image_array[np.newaxis, ...]
         
-        meta = dataset.meta.copy()
-        transform = dataset.transform
-        crs = dataset.crs
-    return image_array, meta, transform, crs
+#         meta = dataset.meta.copy()
+#         transform = dataset.transform
+#         crs = dataset.crs
+#     return image_array, meta, transform, crs
 
 def get_geometries_from_vector_file(vector_file_path, region_id_column='region_id'):
     """
@@ -142,6 +145,71 @@ def save_masked_array_as_tif(array, output_path, original_meta, original_transfo
     
     print(f"Saved region: {output_path}")
 
+def mask_crop_save(array, region_info, transform, meta, crs, output_dir, compress_save=False):
+    # --- Option 1: Save the masked array (full extent, values outside mask are NoData) ---
+    label = region_info['label']
+    polygon = region_info['geometry']
+    image_h, image_w = array.shape[1], array.shape[2]
+
+    mask = create_mask_from_georeferenced_polygon(
+        polygon,
+        (image_h, image_w),
+        transform,
+        crs,
+        crs
+    )
+    
+    masked_full_extent_array = apply_mask_to_array(array, mask, nodata_value=meta.get('nodata', np.nan))
+    
+    true_points = np.argwhere(mask == 1)
+    if true_points.size == 0:
+        raise Exception(f"No true points found in the mask for {label}.")
+
+    min_row, min_col = true_points.min(axis=0)
+    max_row, max_col = true_points.max(axis=0)
+
+    crop_window = Window(min_col, min_row, (max_col - min_col + 1), (max_row - min_row + 1))
+    cropped_transform = rasterio.windows.transform(crop_window, transform)
+    # Crop the 8-Band VI Array
+    array_cropped = masked_full_extent_array[
+        :,
+        crop_window.row_off : crop_window.row_off + crop_window.height,
+        crop_window.col_off : crop_window.col_off + crop_window.width,
+    ]
+
+    # Crop the 2D pixel mask to the same window
+    mask_cropped = mask[
+        crop_window.row_off : crop_window.row_off + crop_window.height,
+        crop_window.col_off : crop_window.col_off + crop_window.width
+    ]
+
+    num_vi_bands = array_cropped.shape[0]
+    for i in range(num_vi_bands):
+        array_cropped[i, :, :][mask_cropped == 0] = meta.get('nodata', np.nan)
+    
+    file_name_tif = os.path.join(output_dir, f"{label}_VIs.tif")
+    save_masked_array_as_tif(array_cropped, file_name_tif, meta, cropped_transform, nodata_value=meta.get('nodata', np.nan))
+    
+    # file_name_tif = os.path.join(output_dir, f"u_{label}_VIs.tif")
+    # utils.save_numpy_as_geotiff(file_name_tif, array_cropped, meta, transform, crs)
+    
+    if compress_save and COMPRESSOR_AVAILABLE:
+        try:
+            if array_cropped.ndim == 3:
+                img_to_compress = array_cropped[0] # Example: compress first band
+            else:
+                img_to_compress = array_cropped
+
+            img_directory = os.path.join(output_dir, 'compressed')
+            os.makedirs(img_directory, exist_ok=True)
+
+            img_8bit = compress(img_to_compress) # Your custom function
+            out_file_png = os.path.join(img_directory, f"region_{label}.png")
+            Image.fromarray(img_8bit).save(out_file_png)
+            print(f"Saved compressed region (PNG): {out_file_png}")
+        except Exception as e:
+            print(f"Could not compress and save PNG for {label}: {e}")
+
 try:
     from compressor import compress
     from PIL import Image
@@ -151,99 +219,116 @@ except ImportError:
     print("Warning: 'compressor' or 'PIL' module not found. PNG saving will not be available.")
 
 
-def tif_to_aoi_pipeline(tif_path, vector_regions_path, output_dir, region_id_col='region_id', compress_save=False):
-    image_array, meta, transform, crs = load_tif_numpy_with_meta(tif_path)
+# def tif_to_aoi_pipeline(tif_path, vector_regions_path, output_dir, region_id_col='region_id', compress_save=False):
+#     image_array, meta, transform, crs = load_tif_numpy_with_meta(tif_path)
     
-    regions_gdf = gpd.read_file(vector_regions_path)
+#     regions_gdf = gpd.read_file(vector_regions_path)
+#     if regions_gdf.crs != crs:
+#         print(f"Reprojecting regions from {regions_gdf.crs} to {crs} (image CRS)")
+#         regions_gdf = regions_gdf.to_crs(crs)
+    
+#     regions_for_processing = []
+#     for _, row in regions_gdf.iterrows():
+#         regions_for_processing.append({'label': row[region_id_col], 'geometry': row.geometry})
+#         break
+
+#     base_output_name = os.path.splitext(os.path.basename(tif_path))[0]
+#     specific_output_dir = os.path.join(output_dir, base_output_name)
+#     os.makedirs(specific_output_dir, exist_ok=True)
+
+#     image_h, image_w = image_array.shape[1], image_array.shape[2]
+
+#     for region_info in regions_for_processing:
+#         label = region_info['label']
+#         polygon = region_info['geometry']
+
+#         # --- Option 1: Save the masked array (full extent, values outside mask are NoData) ---
+#         # mask = create_mask_from_georeferenced_polygon(
+#         #     polygon,
+#         #     (image_h, image_w),
+#         #     transform,
+#         #     crs,
+#         #     regions_gdf.crs
+#         # )
+        
+#         # masked_full_extent_array = apply_mask_to_array(image_array, mask, nodata_value=meta.get('nodata', np.nan))
+#         # file_name_tif = os.path.join(specific_output_dir, f"{label}_VIs.tif")
+        
+#         # if compress_save and COMPRESSOR_AVAILABLE:
+#         #     try:
+#         #         if masked_full_extent_array.ndim == 3:
+#         #             img_to_compress = masked_full_extent_array[0] # Example: compress first band
+#         #         else:
+#         #             img_to_compress = masked_full_extent_array
+
+#         #         img_8bit = compress(img_to_compress) # Your custom function
+#         #         out_file_png = os.path.join(specific_output_dir, f"region_{label}.png")
+#         #         Image.fromarray(img_8bit).save(out_file_png)
+#         #         print(f"Saved compressed region (PNG): {out_file_png}")
+#         #     except Exception as e:
+#         #         print(f"Could not compress and save PNG for {label}: {e}")
+#         #         # Fallback to TIF or skip
+#         #         save_masked_array_as_tif(masked_full_extent_array, file_name_tif, meta, transform, nodata_value=meta.get('nodata', np.nan))
+
+#         # else:
+#         #     save_masked_array_as_tif(masked_full_extent_array, file_name_tif, meta, transform, nodata_value=meta.get('nodata', np.nan))
+#         # break
+
+#         # --- Option 2: Crop to the polygon's extent AND mask (More common for region outputs) ---
+#         # This would use rasterio.mask.mask
+#         # from rasterio.mask import mask as rio_mask
+#         try:
+#             with rasterio.open(tif_path) as src_for_crop: # Re-open to use with rio_mask
+#                 # Ensure polygon is in a list of GeoJSON-like dicts
+#                 shapes_for_crop = [polygon.__geo_interface__]
+#                 cropped_array, cropped_transform = rio_mask(src_for_crop, shapes_for_crop, crop=True, nodata=src_for_crop.nodata)
+            
+#             # Update metadata for the cropped image
+#             cropped_meta = meta.copy()
+#             cropped_meta.update({
+#                 "height": cropped_array.shape[1],
+#                 "width": cropped_array.shape[2],
+#                 "transform": cropped_transform,
+#                 "count": cropped_array.shape[0], # Number of bands
+#                 "dtype": str(cropped_array.dtype),
+#                 "nodata": src_for_crop.nodata # Use original nodata
+#             })
+#             file_name_cropped_tif = os.path.join(specific_output_dir, f"{label}_VIs_cropped.tif")
+#             with rasterio.open(file_name_cropped_tif, "w", **cropped_meta) as dst:
+#                 dst.write(cropped_array)
+#             print(f"Saved CROPPED region: {file_name_cropped_tif}")
+#         except Exception as e:
+#             print(f"Error cropping region {label}: {e}")
+
+    # *****************************************************************************************
+
+# Example usage:
+if __name__ == "__main__":
+    tif_file_path = '/raid/biplab/souravr/TIH/CROP/r1_28Aug23_ndvi_coreg.tif'
+    vector_file_path = '/raid/biplab/souravr/TIH/CROP/all_data/field_regions.gpkg'
+    # output_dir = os.path.join(cfg.OUTPUT_DIR, 'vv_outputs')
+    output_dir = '/raid/biplab/souravr/TIH/CROP/test_region_ndvi'
+    os.makedirs(output_dir, exist_ok=True)
+    array, meta, transform, crs = utils.load_tif_numpy_with_meta(tif_file_path)
+    
+    regions_gdf = gpd.read_file(vector_file_path)
     if regions_gdf.crs != crs:
         print(f"Reprojecting regions from {regions_gdf.crs} to {crs} (image CRS)")
         regions_gdf = regions_gdf.to_crs(crs)
     
     regions_for_processing = []
     for _, row in regions_gdf.iterrows():
-        regions_for_processing.append({'label': row[region_id_col], 'geometry': row.geometry})
+        regions_for_processing.append({'label': row['region_id'], 'geometry': row.geometry})
+    # region = {'label': regions_gdf.iloc[0]['region_id'], 
+    #             'geometry': regions_gdf.iloc[0].geometry}
 
-    base_output_name = os.path.splitext(os.path.basename(tif_path))[0]
-    specific_output_dir = os.path.join(output_dir, base_output_name)
-    os.makedirs(specific_output_dir, exist_ok=True)
-
-    image_h, image_w = image_array.shape[1], image_array.shape[2]
-
-    for region_info in regions_for_processing:
-        label = region_info['label']
-        polygon = region_info['geometry']
-
-        # --- Option 1: Save the masked array (full extent, values outside mask are NoData) ---
-        mask = create_mask_from_georeferenced_polygon(
-            polygon,
-            (image_h, image_w),
+    for region in regions_for_processing:
+        mask_crop_save(
+            array,
+            region,
             transform,
+            meta,
             crs,
-            regions_gdf.crs
+            output_dir,
+            True
         )
-        
-        masked_full_extent_array = apply_mask_to_array(image_array, mask, nodata_value=meta.get('nodata', np.nan))
-        file_name_tif = os.path.join(specific_output_dir, f"{label}_VIs.tif")
-        
-        if compress_save and COMPRESSOR_AVAILABLE:
-            try:
-                if masked_full_extent_array.ndim == 3:
-                    img_to_compress = masked_full_extent_array[0] # Example: compress first band
-                else:
-                    img_to_compress = masked_full_extent_array
-
-                img_8bit = compress(img_to_compress) # Your custom function
-                out_file_png = os.path.join(specific_output_dir, f"region_{label}.png")
-                Image.fromarray(img_8bit).save(out_file_png)
-                print(f"Saved compressed region (PNG): {out_file_png}")
-            except Exception as e:
-                print(f"Could not compress and save PNG for {label}: {e}")
-                # Fallback to TIF or skip
-                save_masked_array_as_tif(masked_full_extent_array, file_name_tif, meta, transform, nodata_value=meta.get('nodata', np.nan))
-
-        else:
-            save_masked_array_as_tif(masked_full_extent_array, file_name_tif, meta, transform, nodata_value=meta.get('nodata', np.nan))
-        break
-
-        # --- Option 2: Crop to the polygon's extent AND mask (More common for region outputs) ---
-        # This would use rasterio.mask.mask
-        # from rasterio.mask import mask as rio_mask
-        # try:
-        #     with rasterio.open(tif_path) as src_for_crop: # Re-open to use with rio_mask
-        #         # Ensure polygon is in a list of GeoJSON-like dicts
-        #         shapes_for_crop = [polygon.__geo_interface__]
-        #         cropped_array, cropped_transform = rio_mask(src_for_crop, shapes_for_crop, crop=True, nodata=src_for_crop.nodata)
-            
-        #     # Update metadata for the cropped image
-        #     cropped_meta = meta.copy()
-        #     cropped_meta.update({
-        #         "height": cropped_array.shape[1],
-        #         "width": cropped_array.shape[2],
-        #         "transform": cropped_transform,
-        #         "count": cropped_array.shape[0], # Number of bands
-        #         "dtype": str(cropped_array.dtype),
-        #         "nodata": src_for_crop.nodata # Use original nodata
-        #     })
-        #     file_name_cropped_tif = os.path.join(specific_output_dir, f"{label}_VIs_cropped.tif")
-        #     with rasterio.open(file_name_cropped_tif, "w", **cropped_meta) as dst:
-        #         dst.write(cropped_array)
-        #     print(f"Saved CROPPED region: {file_name_cropped_tif}")
-        # except Exception as e:
-        #     print(f"Error cropping region {label}: {e}")
-
-    # *****************************************************************************************
-
-# Example usage:
-if __name__ == "__main__":
-    input_tif_multiband = '/raid/biplab/souravr/TIH/CROP/data/this_better_work.tif' # Your 8-band VI TIF
-    vector_regions_file = '/raid/biplab/souravr/TIH/CROP/data/field_regions.gpkg'
-    output_main_dir = '/raid/biplab/souravr/TIH/CROP/mot'
-    region_id_attribute_column = 'region_id' 
-
-    tif_to_aoi_pipeline(
-        input_tif_multiband,
-        vector_regions_file,
-        output_main_dir,
-        region_id_col=region_id_attribute_column,
-        compress_save=False
-    )

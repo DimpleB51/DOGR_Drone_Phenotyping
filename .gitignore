@@ -6,4 +6,7 @@ outputs*
 output*
 *.tif
 *.png
-sandbox.ipynb
+*sandbox*
+# sandbox.ipynb
+# eda/eda_sandbox.ipynb
+config.py
