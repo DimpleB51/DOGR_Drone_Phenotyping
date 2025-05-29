@@ -54,42 +54,108 @@ def clean_tif(tif_data):
     print(f"Percentage of NaN values: {nan_percentage:.2f}%")
     return tif_data
 
-def calculate_VIs(data):
-    ''' 
-    Calculate Vegetation Indices (VIs) from the data.
-    make sure data has channels in the order: [R, G, B, NIR, RE, PANCHRO]
-                                               0  1  2   3    4      5
+import numpy as np
 
-    Returns: a numpy array of shape (8, height, width) containing the VIs
-    '''
-    # Assuming the data is in the format [R, G, B, NIR, RE, PANCHRO]
+def calculate_VIs(data_6channel_bands_first):
+    """
+    Calculates various vegetation indices from 6-channel image data.
+
+    The input data is expected to have bands in the following order:
+    0: Red (R)
+    1: Green (G)
+    2: Blue (B)
+    3: Near-Infrared (NIR)
+    4: RedEdge (RE)
+    5: Panchromatic (PAN) - This channel is not used for these VIs.
+
+    The input array should have shape (num_channels, height, width).
+    Reflectance values should ideally be between 0 and 1.
+
+    Returns:
+        np.ndarray: A NumPy array of shape (15, height, width) containing the calculated VIs.
+                    Handles division by zero by returning NaN or Inf where appropriate based on NumPy's behavior.
+    """
     
-    # calculate VIs
-    # ndvi = (data[:, :, 3] - data[:, :, 0]) / (data[:, :, 3] + data[:, :, 0])
-    # gndvi = (data[..., 3] - data[..., 1]) / (data[..., 3] + data[..., 1])
-    # ndre = (data[..., 3] - data[..., 4]) / (data[..., 3] + data[..., 4])
-    # ci_re = (data[..., 3] - data[..., 4]) - 1
-    # vari = (data[..., 1] - data[..., 0]) / (data[..., 1] + data[..., 0] - data[..., 2])
-    # evi2 = 2.5 * (data[..., 3] - data[..., 0]) / (data[..., 3] + 2.4 * data[..., 0] + 1)
-    # # MCARI = [(RedEdge - Red) - 0.2 * (RedEdge - Green)] * (RedEdge / Red)
-    # mcari = ((data[..., 4] - data[..., 0]) - 0.2 * (data[..., 4] - data[..., 1])) * (data[..., 4] / data[..., 0])
-    # norm2 = (data[..., 0] - data[..., 1]) / (data[..., 0] + data[..., 1])
+    R = data_6channel_bands_first[0].astype(np.float32)
+    G = data_6channel_bands_first[1].astype(np.float32)
+    B = data_6channel_bands_first[2].astype(np.float32)
+    NIR = data_6channel_bands_first[3].astype(np.float32)
+    RE = data_6channel_bands_first[4].astype(np.float32)
+    # PAN = data_6channel_bands_first[5] # Not used
 
+    epsilon = 1e-8 
 
-    # calculate VIs
-    ndvi = (data[3] - data[0]) / (data[3] + data[0])
-    gndvi = (data[3] - data[1]) / (data[3] + data[1])
-    ndre = (data[3] - data[4]) / (data[3] + data[4])
-    ci_re = (data[3] - data[4]) - 1
-    vari = (data[1] - data[0]) / (data[1] + data[0] - data[2])
-    evi2 = 2.5 * (data[3] - data[0]) / (data[3] + 2.4 * data[0] + 1)
-    # MCARI = [(RedEdge - Red) - 0.2 * (RedEdge - Green)] * (RedEdge / Red)
-    mcari = ((data[4] - data[0]) - 0.2 * (data[4] - data[1])) * (data[4] / data[0])
-    norm2 = (data[0] - data[1]) / (data[0] + data[1])
+    with np.errstate(divide='ignore', invalid='ignore'):
+        # 0. NDVI
+        ndvi = (NIR - R) / (NIR + R + epsilon)
+        
+        # 1. NDRE
+        ndre = (NIR - RE) / (NIR + RE + epsilon)
+        
+        # 2. GNDVI
+        gndvi = (NIR - G) / (NIR + G + epsilon)
+        
+        # 3. Red Edge Chlorophyll Index (CI-RE)
+        ci_re = (NIR / (RE + epsilon)) - 1
+        
+        # 4. Visible Atmospherically Resistant Index (VARI)
+        vari = (G - R) / (G + R - B + epsilon)
+        
+        # 5. Enhanced Vegetation Index 2 (EVI2)
+        evi2 = 2.5 * (NIR - R) / (NIR + 2.4 * R + 1.0 + epsilon) # Added epsilon to denominator sum part
+        
+        # 6. NGRDI (Normalized Green Red Difference Index)
+        ngrdi = (G - R) / (G + R + epsilon)
+        
+        # 7. BGI (Blue Green Index - assuming typical formulation, yours is different)
+        # Your formula: (NIR + Red) / Green
+        # Common BGI for soil: B / G. For vegetation health, sometimes (G-B)/(G+B) or similar.
+        # Implementing your formula:
+        bgi_custom = (NIR + R) / (G + epsilon)
+        
+        # 8. GLI (Green Leaf Index - assuming typical formulation, yours is different)
+        # Your formula: Green / (NIR + Red)
+        # Common GLI: (2*G - R - B) / (2*G + R + B)
+        # Implementing your formula:
+        gli_custom = G / (NIR + R + epsilon)
+
+        # 9. DVI (Difference Vegetation Index)
+        dvi = NIR - R
+        
+        # 10. SR (Simple Ratio - using Red Edge as per your table)
+        sr_re = NIR / (RE + epsilon) # Your table says NIR / Red Edge
+        
+        # 11. NORM2 ( (Red - Green) / (Red + Green) )
+        norm2 = (R - G) / (R + G + epsilon)
+        
+        # 12. NORM3 ( (Red - Blue) / (Red + Blue) )
+        norm3 = (R - B) / (R + B + epsilon)
+        
+        # 13. SAVI (Soil Adjusted Vegetation Index)
+        L_savi = 0.5 # Common value for L
+        savi = ((NIR - R) / (NIR + R + L_savi + epsilon)) * (1 + L_savi)
+        
+        # 14. LAI (Leaf Area Index - using the provided empirical formula)
+        # (3.618 * 2.5 * (NIR - R)) / (NIR + 6 * R - 7.5 * B + 1) - 0.118
+        # This formula is specific and might be from a particular study/sensor.
+        # Note: EVI often used as a base for LAI, this formula resembles EVI structure.
+        # Denominator: NIR + C1*R - C2*B + L_evi
+        # Original EVI: G_factor * (NIR - R) / (NIR + C1*R - C2*B + L_evi)
+        # LAI formula: k * EVI_like_term + c
+        # where EVI_like_term is (NIR - R) / (NIR + 6R - 7.5B + 1)
+        # and k = 3.618 * 2.5
+        # and c = -0.118
+        
+        lai_numerator = 3.618 * 2.5 * (NIR - R)
+        lai_denominator = NIR + 6.0 * R - 7.5 * B + 1.0 + epsilon # Added epsilon
+        lai = (lai_numerator / lai_denominator) - 0.118
+
+    vis_all = np.stack((
+        ndvi, ndre, gndvi, ci_re, vari, evi2, ngrdi, 
+        bgi_custom, gli_custom, dvi, sr_re, norm2, norm3, savi, lai
+    ), axis=0)
     
-    vis = np.stack((ndvi, gndvi, ndre, ci_re, vari, evi2, mcari, norm2), axis=0)
-    print("VIs shape:", vis.shape)
-    return vis
+    return vis_all
 
 def save_numpy_as_geotiff(output_path, image_array, meta, transform, crs):
     # Update metadata if needed (e.g. shape, data type)
