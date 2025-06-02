@@ -1,0 +1,436 @@
+install.packages(c("tidyverse", "sf", "randomForest", "caret", "corrplot", "raster", "rgdal"))
+library(tidyverse)
+library(sf)
+library(randomForest)
+library(caret)
+library(corrplot)
+
+
+
+setwd("C:/Users/Suresh Gawande/Desktop/Yield prediction/2023")
+csv_data <- read.csv("new_kharif.csv")
+shape_data <- st_read("Kharif_shape.shp")
+# Example assuming both have 'fid' column
+joined_data <- shape_data %>%
+  left_join(csv_data, by = "fid")
+
+plot(joined_data["AUDPC_AN"])  # Replace 'NDVI1' with any column you want to visualize
+
+
+# Select relevant columns
+cor_data1 <- joined_data %>%
+  st_drop_geometry() %>%
+  select(contains("NDVI1"), contains("NDRE1"), contains("SAVI1"),
+         contains("LAI1"), contains("PH1"), contains("Thrips1"),
+         contains("PDI_SB1"), contains("PDI_PB1"), contains("PDI_AN1"))
+
+# Correlation matrix
+cor_matrix1 <- cor(cor_data1, use = "complete.obs")
+corrplot(cor_matrix1, method = "color", type = "upper", tl.cex = 0.6)
+
+
+
+set.seed(123)
+rf_PH1 <- randomForest(PDI_AN2 ~ NDVI2 + NDRE2 +  NORM22 ,
+                       data = joined_data, ntree = 500, importance = TRUE, na.action = na.omit)
+
+print(rf_PH1)
+varImpPlot(rf_PH1)
+
+
+set.seed(123)
+
+model_thrips <- train(
+  Thrips2 ~ NDVI3 + NDRE3 + SAVI3 + LAI3 + DVI3 + NORM23 ,
+  data = joined_data,
+  method = "rf",
+  trControl = trainControl(method = "cv", number = 5),
+  importance = TRUE,
+  na.action = na.omit
+)
+
+print(model_thrips)
+
+
+set.seed(123)
+
+rf_disease <- randomForest(PDI_AN1 ~ NDVI1 + NDRE1 + SAVI1 + LAI1 + Thrips1 + PH1,
+                           data = joined_data, ntree = 500, importance = TRUE, na.action = na.omit)
+
+print(rf_disease)
+varImpPlot(rf_disease)
+varImpPlot(rf_disease, main = "Variable Importance for PDI_AN1")
+
+# Predict on the same data (or a test set if available)
+joined_data$PDI_AN1_Pred <- predict(rf_disease, newdata = joined_data)
+
+# Scatter plot of observed vs predicted
+library(ggplot2)
+ggplot(joined_data, aes(x = PDI_AN1, y = PDI_AN1_Pred)) +
+  geom_point(color = "blue", size = 2) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  theme_minimal() +
+  labs(title = "Observed vs Predicted PDI_AN1",
+       x = "Observed", y = "Predicted")
+
+ggplot(joined_data) +
+  geom_sf(aes(fill = PDI_AN1_Pred)) +
+  scale_fill_viridis_c(option = "C") +
+  theme_minimal() +
+  ggtitle("Predicted Alternaria Disease Intensity (Stage 1)")
+
+library(caret)
+
+set.seed(123)
+train_control <- trainControl(method = "cv", number = 5)
+
+model_cv <- train(
+  PDI_AN3 ~ NDVI3 + NDRE3 + SAVI3 + LAI3 + Thrips3 + PH3,
+  data = joined_data,
+  method = "rf",
+  trControl = train_control,
+  importance = TRUE
+)
+
+print(model_cv)
+
+ggplot(joined_data) +
+  geom_sf(aes(fill = Thrips1)) +
+  scale_fill_viridis_c(option = "C") +
+  theme_minimal() +
+  ggtitle("Spatial Distribution of Thrips at Vegetative stage")
+
+
+
+
+
+
+######
+library(randomForest)
+library(caret)
+library(dplyr)
+
+# --- Set random seed for reproducibility ---
+set.seed(123)
+
+# --- Define variables ---
+stages <- 1:3
+responses <- c("PH", "PDI_AN", "PDI_SB", "PDI_PB", "Thrips","MY")
+results_list <- list()
+
+# --- Loop through stages and response variables ---
+for (stage in stages) {
+  for (resp in responses) {
+    
+    response_var <- paste0(resp, stage)
+    predictor_vars <- c(
+      paste0("NDVI", stage),
+      paste0("NDRE", stage),
+      paste0("SAVI", stage),
+      paste0("LAI", stage),
+      paste0("DVI", stage),
+      paste0("NORM2", stage),
+      paste0("NORM3", stage),
+      paste0("SR", stage),
+      paste0("GNDVI", stage)
+    )
+    
+    # Ensure unique predictors (PH may be the response)
+    predictor_vars <- setdiff(predictor_vars, response_var)
+    
+    # Create formula
+    formula_rf <- as.formula(
+      paste(response_var, "~", paste(predictor_vars, collapse = " + "))
+    )
+    
+    # Train model using caret
+    model <- train(
+      formula_rf,
+      data = joined_data,
+      method = "rf",
+      trControl = trainControl(method = "cv", number = 5),
+      importance = TRUE,
+      na.action = na.omit
+    )
+    
+    # Store results
+    results_list[[paste0(resp, "_Stage", stage)]] <- list(
+      model = model,
+      RMSE = model$results$RMSE[model$results$mtry == model$bestTune$mtry],
+      Rsquared = model$results$Rsquared[model$results$mtry == model$bestTune$mtry],
+      MAE = model$results$MAE[model$results$mtry == model$bestTune$mtry],
+      Best_mtry = model$bestTune$mtry
+    )
+  }
+}
+
+# Create a summary table
+summary_df <- bind_rows(lapply(names(results_list), function(name) {
+  res <- results_list[[name]]
+  data.frame(
+    Model = name,
+    RMSE = round(res$RMSE, 3),
+    Rsquared = round(res$Rsquared, 3),
+    MAE = round(res$MAE, 3),
+    Best_mtry = res$Best_mtry
+  )
+}), .id = NULL)
+
+print(summary_df)
+
+
+
+
+####yield
+library(caret)
+library(randomForest)
+set.seed(123)
+
+# Define stages and initialize list
+stages <- 1:3
+my_stage_results <- list()
+
+for (stage in stages) {
+  
+  # Define predictor variables for this stage
+  predictors <- c(
+    paste0("NDVI", stage),
+    paste0("NDRE", stage),
+    paste0("SAVI", stage),
+    paste0("LAI", stage),
+    paste0("NORM2", stage),
+    paste0("SR", stage),
+    paste0("GNDVI", stage)
+  )
+  
+  # Create formula: MY ~ indices at this stage
+  formula_stage <- as.formula(
+    paste("MY ~", paste(predictors, collapse = " + "))
+  )
+  
+  # Train model
+  model_stage <- train(
+    formula_stage,
+    data = joined_data,
+    method = "rf",
+    trControl = trainControl(method = "cv", number = 5),
+    importance = TRUE,
+    na.action = na.omit
+  )
+  
+  # Store results
+  my_stage_results[[paste0("Stage", stage)]] <- list(
+    model = model_stage,
+    RMSE = model_stage$results$RMSE[model_stage$results$mtry == model_stage$bestTune$mtry],
+    Rsquared = model_stage$results$Rsquared[model_stage$results$mtry == model_stage$bestTune$mtry],
+    MAE = model_stage$results$MAE[model_stage$results$mtry == model_stage$bestTune$mtry],
+    Best_mtry = model_stage$bestTune$mtry
+  )
+}
+
+# --- Create Summary Table ---
+summary_my_stage <- bind_rows(lapply(names(my_stage_results), function(name) {
+  res <- my_stage_results[[name]]
+  data.frame(
+    Stage = name,
+    RMSE = round(res$RMSE, 3),
+    Rsquared = round(res$Rsquared, 3),
+    MAE = round(res$MAE, 3),
+    Best_mtry = res$Best_mtry
+  )
+}), .id = NULL)
+
+# View the result
+print(summary_my_stage)
+
+
+
+cor_data <- joined_data %>%
+      dplyr::select(PDI_AN2, NDVI3, NDRE3, NORM23) %>%
+       na.omit()
+
+
+cor(cor_data$PDI_AN2, cor_data$NDVI3, use = "complete.obs")
+cor(cor_data$PDI_AN2, cor_data$NDRE3, use = "complete.obs")
+cor(cor_data$PDI_AN2, cor_data$NORM23, use = "complete.obs")
+
+
+
+library(caret)
+set.seed(123)
+
+train_control <- trainControl(method = "cv", number = 5)
+
+# List of models to try
+models <- c("lm","rf" ,"svmRadial", "gbm", "glmnet", "knn", "rpart")
+
+# Store results here
+results <- list()
+
+for (model_name in models) {
+  cat("Training model:", model_name, "\n")
+  model <- train(
+    Thrips2 ~ NDVI3 + NDRE3 + SAVI3 + LAI3 + SR3 + DVI3 + NDVI2 + NDRE2 + SAVI2 + LAI2 + SR2 + DVI2,
+    data = joined_data,
+    method = model_name,
+    trControl = train_control
+  )
+  results[[model_name]] <- model
+  print(model)
+}
+
+# Compare results visually
+resamples_list <- resamples(results)
+summary(resamples_list)
+bwplot(resamples_list, metric = "RMSE")
+
+
+
+
+###########ML Models###########
+library(caret)
+set.seed(123)
+
+train_control <- trainControl(method = "cv", number = 5)
+
+# List of models to try
+models <- c("lm", "rf", "svmRadial", "gbm", "glmnet")
+results <- list()
+
+# Train all models
+for (model_name in models) {
+  cat("Training model:", model_name, "\n")
+  model <- train(
+    MY ~ NDVI3 + NDRE3 + SAVI3 + LAI3 + SR3 + DVI3 +PH3 + PSW3,
+    data = joined_data,
+    method = model_name,
+    trControl = train_control,
+    metric = "Rsquared"
+  )
+  results[[model_name]] <- model
+  print(model)
+}
+
+# Compare all models
+resamples_list <- resamples(results)
+summary(resamples_list)
+
+# 📊 Boxplot comparison of R-squared
+bwplot(resamples_list, metric = "Rsquared", main = "Model Comparison (R²)")
+
+library(ggplot2)
+library(gridExtra)
+
+# Plot Actual vs Predicted for each model
+plot_list <- list()
+
+for (model_name in names(results)) {
+  model <- results[[model_name]]
+  
+  # Get predictions on training data
+  predictions <- predict(model, newdata = joined_data)
+  actual <- joined_data$MY
+  
+  # Create a data frame for plotting
+  df_plot <- data.frame(Actual = actual, Predicted = predictions)
+  
+  # Plot
+  p <- ggplot(df_plot, aes(x = Actual, y = Predicted)) +
+    geom_point(alpha = 0.7, color = "steelblue") +
+    geom_smooth(method = "lm", se = FALSE, color = "red", linetype = "dashed") +
+    labs(title = paste("Actual vs Predicted -", model_name),
+         x = "Actual MY", y = "Predicted MY") +
+    theme_minimal()
+  
+  plot_list[[model_name]] <- p
+}
+
+# Arrange all plots (show 2 per row)
+do.call("grid.arrange", c(plot_list, ncol = 2))
+
+
+
+
+
+
+# ✅ Find the best model by highest R-squared mean
+rsq_summary <- summary(resamples_list)$statistics$Rsquared
+best_model_name <- names(which.max(rsq_summary[, "Mean"]))
+cat("🏆 Best Model based on R²:", best_model_name, "\n")
+
+# ✅ Print the best model summary
+print(results[[best_model_name]])
+
+# 🔍 Feature importance plot for best model (if supported)
+if ("varImp" %in% methods(class = class(results[[best_model_name]])[1])) {
+  importance <- varImp(results[[best_model_name]])
+  print(importance)
+  plot(importance, top = 10, main = paste("Top 10 Features -", best_model_name))
+} else {
+  cat("⚠️ Feature importance not available for model:", best_model_name, "\n")
+}
+
+
+########Linear model ####
+# Select predictors for time point 2
+vars_time2 <- c("NDVI2", "NDRE2", "SAVI2", "LAI2", "SR2", "DVI2", "PH2", "PsL2", "PDI_AN2")
+
+# Subset the data
+df2 <- csv_data[, vars_time2]
+
+# Remove NA rows (if any)
+df2 <- na.omit(df2)
+# Standardize predictors only
+library(caret)
+
+pre_proc <- preProcess(df2[, -which(names(df2) == "PDI_AN2")], method = c("center", "scale"))
+df2_scaled <- predict(pre_proc, df2)
+
+# Add target back
+df2_scaled$PDI_AN2 <- df2$PDI_AN2
+
+lm_model_scaled <- lm(PDI_AN2 ~ NDVI2 + NDRE2 + SAVI2 + LAI2 + SR2 + DVI2 + PH2 + PsL2, data = df2_scaled)
+summary(lm_model_scaled)
+
+# Plot effect directions
+barplot(
+  coef(lm_model_scaled)[-1],
+  main = "Standardized Effects on Anthracnose (PDI_AN2)",
+  ylab = "Standardized Coefficient",
+  col = ifelse(coef(lm_model_scaled)[-1] > 0, "red", "blue"),
+  las = 2
+)
+abline(h = 0, lty = 2)
+
+
+
+library(ggplot2)
+library(gridExtra)
+
+# Plot Actual vs Predicted for each model
+plot_list <- list()
+
+for (model_name in names(results)) {
+  model <- results[[model_name]]
+  
+  # Get predictions on training data
+  predictions <- predict(model, newdata = joined_data)
+  actual <- joined_data$PDI_SB3
+  
+  # Create a data frame for plotting
+  df_plot <- data.frame(Actual = actual, Predicted = predictions)
+  
+  # Plot
+  p <- ggplot(df_plot, aes(x = Actual, y = Predicted)) +
+    geom_point(alpha = 0.7, color = "steelblue") +
+    geom_smooth(method = "lm", se = FALSE, color = "red", linetype = "dashed") +
+    labs(title = paste("Actual vs Predicted -", model_name),
+         x = "Actual PDI_SB3", y = "Predicted PDI_SB3") +
+    theme_minimal()
+  
+  plot_list[[model_name]] <- p
+}
+
+# Arrange all plots (show 2 per row)
+do.call("grid.arrange", c(plot_list, ncol = 2))
+
