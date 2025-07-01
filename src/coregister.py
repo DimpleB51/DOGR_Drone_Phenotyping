@@ -30,29 +30,24 @@ def my_coreg(
     print(f"Executing command 2: {line2}")
     subprocess.run(line2, shell=True, check=True)
 
-
-
-import config as cfg
-# --- Main Script Logic ---
-if __name__ == "__main__":
-    SLAVE_DATE_LABEL = 'YY_MM_DD' # Example slave date
-    QGIS_GCP_POINTS_FILE = os.path.join(cfg.ALL_DATA_DIR, 'name_of_points_file.points')
-    TEMP_FOLDER = os.path.join(cfg.ALL_DATA_DIR, 'temp')
-    FINAL_COREG_OUTPUT_DIR = os.path.join(cfg.OUTPUT_DIR, 'coreg', SLAVE_DATE_LABEL)
+def process_date(slave_date_label):
+    FINAL_SOURCE_FOLDER = os.path.join(cfg.DATA_DIR, slave_date_label)
+    QGIS_COMMAND_FILE = os.path.join(cfg.ALL_DATA_DIR, 'commands', f'{slave_date_label}.txt')
+    FINAL_COREG_OUTPUT_DIR = os.path.join(cfg.COREG_DIR, slave_date_label)
     os.makedirs(FINAL_COREG_OUTPUT_DIR, exist_ok=True)
 
     # --- Process ---
-    if not os.path.exists(QGIS_GCP_POINTS_FILE):
-        print(f"FATAL: QGIS GCP .points file not found: {QGIS_GCP_POINTS_FILE}")
+    if not os.path.exists(QGIS_COMMAND_FILE):
+        print(f"FATAL: QGIS GCP .points file not found: {QGIS_COMMAND_FILE}")
     else:
-        for tif_band in tqdm(sorted(os.listdir(os.path.join(cfg.DATA_DIR, SLAVE_DATE_LABEL)))):
+        for tif_band in tqdm(sorted(os.listdir(FINAL_SOURCE_FOLDER))):
             if tif_band.endswith('.tif'):
-                source_tif_path = os.path.join(cfg.DATA_DIR, SLAVE_DATE_LABEL, tif_band)
+                source_tif_path = os.path.join(FINAL_SOURCE_FOLDER, tif_band)
                 coregistered_tif_path = os.path.join(FINAL_COREG_OUTPUT_DIR, tif_band)
                 try:
                     my_coreg(
                         source_tif_path=source_tif_path,
-                        points_file_path=QGIS_GCP_POINTS_FILE,
+                        points_file_path=QGIS_COMMAND_FILE,
                         output_tif_path=coregistered_tif_path
                     )
                     print(f"Coregistered {tif_band} successfully.")
@@ -60,3 +55,19 @@ if __name__ == "__main__":
                     print(f"Error processing {tif_band}: {e}")
                     continue
         print(f"Coregistration completed. Output saved to: {FINAL_COREG_OUTPUT_DIR}")
+
+import config as cfg
+
+# --- Main Script Logic ---
+if __name__ == "__main__":
+
+    # List of slave dates
+    SLAVE_DATE_LABELS = [date_folder for date_folder in sorted(os.listdir(cfg.DATA_DIR))]
+    SLAVE_DATE_LABELS = ['24_03_07']
+    print(f"Found {len(SLAVE_DATE_LABELS)} slave date folders in {cfg.DATA_DIR}")
+    print(f"Slave date labels: {SLAVE_DATE_LABELS}")
+
+    TEMP_FOLDER = os.path.join(cfg.ALL_DATA_DIR, 'temp') 
+    for slave_date_label in SLAVE_DATE_LABELS:
+        print(f"Processing date: {slave_date_label}")
+        process_date(slave_date_label)
