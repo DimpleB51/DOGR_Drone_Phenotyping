@@ -6,8 +6,6 @@ import matplotlib.pyplot as plt
 
 import numpy as np
 
-
-
 def load_tif_numpy_with_meta(tiff_path):
     """
     Load a TIFF file as a NumPy array using rasterio.
