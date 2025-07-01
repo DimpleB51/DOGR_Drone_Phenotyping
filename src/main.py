@@ -3,15 +3,13 @@ import argparse
 from tqdm import tqdm
 
 import numpy as np
-from rasterio.windows import Window
 
 import utils
 import mask_me_v2 as mask2
-from affine import Affine
-import compressor
-import sys
 import config as cfg
 import geopandas as gpd
+import pandas as pd
+from datetime import datetime
 
 def combine_bands(folder_path):
     all_tif_data = np.empty((6, 0, 0))
@@ -21,7 +19,8 @@ def combine_bands(folder_path):
     date = os.path.basename(folder_path)
     for tiffile in tqdm(sorted(os.listdir(folder_path)), 
                             desc=f"Processing {date} Tif Files", 
-                            unit="file"):
+                            unit="file",
+                            leave=False):
         # [B, G, NIR, PANCHRO, RE, R]
         tif_path = os.path.join(folder_path, tiffile)
         tif_data, meta, transform, t_crs = utils.load_tif_numpy_with_meta(tif_path)
@@ -64,7 +63,7 @@ def main():
     parser = argparse.ArgumentParser(description="Process TIF files to compute indices and apply mask.")
     parser.add_argument(
         '--root_folder', type=str, 
-        default=os.path.join(cfg.DATA_DIR, 'coreg'), 
+        default=os.path.join(cfg.COREG_DIR), 
         help="Input folder containing date wise folders containing bandwise TIF files."
         )
     parser.add_argument(
@@ -73,9 +72,14 @@ def main():
         help="Folder to save output files."
         )
     parser.add_argument(
-        '--mask_json', type=str, 
-        default=os.path.join(cfg.ALL_DATA_DIR, 'field_regions.gpkg'), 
-        help="JSON file with polygon coordinates."
+        '--trial_no', type=int,
+        required=True,
+        help="Trial number for processing."
+    )
+    parser.add_argument(
+        '--trials_details', type=str,
+        default=os.path.join(cfg.ALL_DATA_DIR, 'trials_details.csv'),
+        help="JSON file with trials details."
         )
     parser.add_argument(
         '--compress_save', 
@@ -85,23 +89,54 @@ def main():
     args = parser.parse_args()
 
     root_folder = args.root_folder
-    base_file = os.path.basename(root_folder)
-    output_folder = args.output_folder
-    mask_json = args.mask_json
+    output_folder = os.path.join(args.output_folder, f'trial_{args.trial_no}')
+    mask_json = os.path.join(cfg.ALL_DATA_DIR, 'masks', f'trial_{args.trial_no}.gpkg')
     compress_save = args.compress_save
 
     region_id_col = 'region_id'
+    treatment_id_col = 'treat_id'
     regions_gdf = gpd.read_file(mask_json)
     
-    with tqdm(total=len(os.listdir(root_folder)),
+    # Read trials details and filter by trial_no
+    trials_df = pd.read_csv(args.trials_details)
+    trial_row = trials_df[trials_df['Trial_No'] == f'Trial_{args.trial_no}']
+
+    if trial_row.empty:
+        print(f"{trials_df['Trial_No']}")
+
+        raise ValueError(f"Trial number {args.trial_no} not found in trials details")
+
+    trial_info = trial_row.iloc[0]
+    transplanting_date = pd.to_datetime(trial_info['Date_of_Transplanting']).date()
+    harvesting_date = pd.to_datetime(trial_info['Date_of_Harvesting']).date()
+
+    print(f"Processing dates between {transplanting_date} and {harvesting_date} for trial {args.trial_no}")
+
+    # Filter available dates based on transplanting and harvesting dates
+    available_dates = []
+    
+    for date_folder in sorted(os.listdir(root_folder)):
+        try:
+            folder_date = datetime.strptime(f"20{date_folder}", '%Y_%m_%d').date()
+            if transplanting_date <= folder_date <= harvesting_date:
+                available_dates.append(date_folder)
+        except ValueError:
+            # Skip folders that don't match date format
+            continue
+
+    available_dates = sorted(available_dates)
+    print(f"Found {len(available_dates)} dates to process: {available_dates}")
+    
+    with tqdm(total=len(available_dates),
                 desc="Processing Dates", 
-                unit="date") as pbar:
+                unit="date",
+                position=0) as pbar:
         # for date_folder in sorted(os.listdir(root_folder)):
-        for date_folder in sorted(os.listdir(root_folder)):
-            pbar.set_postfix_str(f"Processing {date_folder}")
-            specific_output_dir = os.path.join(output_folder, date_folder)
+        for date in sorted(available_dates):
+            pbar.set_postfix_str(f"Processing {date}")
+            specific_output_dir = os.path.join(output_folder, date)
             if not (os.path.exists(specific_output_dir) and output_exists(specific_output_dir)):
-                date_folder_path = os.path.join(root_folder, date_folder)
+                date_folder_path = os.path.join(root_folder, date)
                 
                 all_tif_data, meta, transform, crs = combine_bands(date_folder_path)
                 if regions_gdf.crs != crs:
@@ -110,22 +145,31 @@ def main():
                 
                 regions_for_processing = []
                 for _, row in regions_gdf.iterrows():
-                    regions_for_processing.append({'label': row[region_id_col], 'geometry': row.geometry})
-                    
-                
+                    regions_for_processing.append({ 
+                        'label': f'R{row.get(region_id_col)}T{row.get(treatment_id_col)}', 
+                        'geometry': row.geometry
+                        })
+
                 indices_data = utils.calculate_VIs(all_tif_data)
                 os.makedirs(specific_output_dir, exist_ok=True)
                 
-                for region_info in regions_for_processing:
-                    mask2.mask_crop_save(indices_data, 
-                                            region_info, 
-                                            transform, 
-                                            meta,
-                                            crs, 
-                                            specific_output_dir, 
-                                            compress_save)
+                with tqdm(total=len(regions_for_processing),
+                            desc=f'Processing regions for {date}',
+                            unit='region',
+                            position=1,
+                            leave=False) as regBar:
+                    for region_info in regions_for_processing:
+                        regBar.set_postfix_str(f"Processing {region_info['label']}")
+                        mask2.mask_crop_save(indices_data, 
+                                                region_info, 
+                                                transform, 
+                                                meta,
+                                                crs, 
+                                                specific_output_dir, 
+                                                compress_save)
+                        regBar.update(1)
             else:
-                print(f"Output folder already exists for {date_folder}. Skipping...")
+                print(f"Output folder already exists for {date}. Skipping...")
             pbar.update(1)
                   
 if __name__ == "__main__":
