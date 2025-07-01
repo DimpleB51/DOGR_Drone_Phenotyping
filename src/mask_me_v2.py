@@ -131,11 +131,11 @@ def save_masked_array_as_tif(array, output_path, original_meta, original_transfo
     with rasterio.open(output_path, "w", **meta) as dst:
         dst.write(array)
     
-    print(f"Saved region: {output_path}")
+    # print(f"Saved region: {output_path}")
 
 def mask_crop_save(array, region_info, transform, meta, crs, output_dir, compress_save=False):
     # --- Option 1: Save the masked array (full extent, values outside mask are NoData) ---
-    label = region_info['label']
+    label = region_info.get('label')
     polygon = region_info['geometry']
     image_h, image_w = array.shape[1], array.shape[2]
 
@@ -151,7 +151,7 @@ def mask_crop_save(array, region_info, transform, meta, crs, output_dir, compres
     
     true_points = np.argwhere(mask == 1)
     if true_points.size == 0:
-        raise Exception(f"No true points found in the mask for {label}.")
+        raise Exception(f"No true points found in the mask for '{label}.")
 
     min_row, min_col = true_points.min(axis=0)
     max_row, max_col = true_points.max(axis=0)
@@ -192,9 +192,9 @@ def mask_crop_save(array, region_info, transform, meta, crs, output_dir, compres
             os.makedirs(img_directory, exist_ok=True)
 
             img_8bit = compress(img_to_compress) # Your custom function
-            out_file_png = os.path.join(img_directory, f"region_{label}.png")
+            out_file_png = os.path.join(img_directory, f"{label}.png")
             Image.fromarray(img_8bit).save(out_file_png)
-            print(f"Saved compressed region (PNG): {out_file_png}")
+            # print(f"Saved compressed region (PNG): {out_file_png}")
         except Exception as e:
             print(f"Could not compress and save PNG for {label}: {e}")
 
