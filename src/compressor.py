@@ -45,14 +45,12 @@ def compress_multi(tiffile, output_folder):
 
 
 def main():
-    tiffile = 'path/to/tiffile'
-    print(f'Processing {tif_path}')
+    tiff_file = 'path/to/tiff_file'
+    output_folder = 'path/to/output_folder'
+    print(f'Processing {tiff_file}')
     compress_multi(
-        tif_path, 
-        os.path.join(
-            '/raid/biplab/souravr/TIH/CROP/output/compressed',
-            folder.split('/')[-1]
-        )
+        tiff_file, 
+        output_folder
     )
 
 if __name__ == "__main__":
