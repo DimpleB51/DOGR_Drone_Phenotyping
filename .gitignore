@@ -9,3 +9,8 @@ output*
 *sandbox*
 mask_me.py
 try.py
+*.log
+*.points
+*.gif
+*.sh
+*.ipynb
