@@ -1,5 +1,5 @@
 # Weather data empirically affecting diseases found by the DOGR scientists
-![data](./images/image.png)
+![data](../images/image.png)
 
 # 🌱 Weather-Based Classification of Thrips and Diseases in Onion Plants
 
