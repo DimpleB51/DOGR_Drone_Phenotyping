@@ -1,3 +1,6 @@
+# Weather data empirically affecting diseases found by the DOGR scientists
+![data](./images/image.png)
+
 # 🌱 Weather-Based Classification of Thrips and Diseases in Onion Plants
 
 Great! Since you have **high-resolution (15-minute interval)** weather station data and are working on classifying **thrips**, **blight**, **blotch**, and **anthracnose** in onion plants, you're in a strong position to **engineer biologically meaningful features** and build an effective classification model.
