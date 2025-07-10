@@ -33,5 +33,6 @@ VI_TO_IDX = {
     'norm2': 11, 
     'norm3': 12, 
     'savi': 13, 
-    'lai': 14
+    'lai': 14,
+    'psri': 15
 }

@@ -148,9 +148,12 @@ def calculate_VIs(data_6channel_bands_first):
         lai_denominator = NIR + 6.0 * R - 7.5 * B + 1.0 + epsilon # Added epsilon
         lai = (lai_numerator / lai_denominator) - 0.118
 
+        # 15. Reflective Index (PSRI) Blight -> Higher PSRI value
+        psri = (R - B) / RE
+
     vis_all = np.stack((
         ndvi, ndre, gndvi, ci_re, vari, evi2, ngrdi, 
-        bgi_custom, gli_custom, dvi, sr_re, norm2, norm3, savi, lai
+        bgi_custom, gli_custom, dvi, sr_re, norm2, norm3, savi, lai, psri
     ), axis=0)
     
     return vis_all
