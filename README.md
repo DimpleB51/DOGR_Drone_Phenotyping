@@ -1,5 +1,5 @@
 # INDICES
-[Indices](https://tihiitb-my.sharepoint.com/:x:/g/personal/dimple_bhuta_tihiitb_org/EZU9YNO-ms9U6cvh58ZcHNkB0CDYp9QhFC_kQudNnp_Ckg?e=YHepXr)
+[Indices](https://docs.google.com/spreadsheets/d/1KajGFBLdNTg6N7FihxCQLv95GFzDTnZ2/edit?usp=sharing&ouid=104284351351877089975&rtpof=true&sd=true)
 
 # Problem statement
 ![Aerial Phenotyping](./images/ProblemStatement_DOGR.png)
