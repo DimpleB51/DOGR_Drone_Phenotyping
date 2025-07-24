@@ -8,4 +8,4 @@ This codes combines **weather.csv**, **Jan-Sept_2024_Weather_data.xlsx** and **M
 ```
 weather_data_trialscomb.ipynb
 ```
-generates aggregated_weather_data.xlsx
+generates **aggregated_weather_data.xlsx**
