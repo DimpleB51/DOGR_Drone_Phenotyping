@@ -5,7 +5,7 @@ from rasterio.windows import Window
 from rasterio.mask import mask as rio_mask
 import os
 
-import preprocess.utils as utils
+import utils as utils
 import geopandas as gpd
 import config as cfg
 
@@ -133,7 +133,7 @@ def save_masked_array_as_tif(array, output_path, original_meta, original_transfo
     
     # print(f"Saved region: {output_path}")
 
-def mask_crop_save(array, region_info, transform, meta, crs, output_dir, compress_save=False):
+def mask_crop_save(array, region_info, transform, meta, crs, output_dir, post_title, compress_save=False):
     # --- Option 1: Save the masked array (full extent, values outside mask are NoData) ---
     label = region_info.get('label')
     polygon = region_info['geometry']
@@ -175,7 +175,7 @@ def mask_crop_save(array, region_info, transform, meta, crs, output_dir, compres
     for i in range(num_vi_bands):
         array_cropped[i, :, :][mask_cropped == 0] = meta.get('nodata', np.nan)
     
-    file_name_tif = os.path.join(output_dir, f"{label}_VIs.tif")
+    file_name_tif = os.path.join(output_dir, f"{label}_{post_title}.tif")
     save_masked_array_as_tif(array_cropped, file_name_tif, meta, cropped_transform, nodata_value=meta.get('nodata', np.nan))
     
     # file_name_tif = os.path.join(output_dir, f"u_{label}_VIs.tif")
@@ -199,7 +199,7 @@ def mask_crop_save(array, region_info, transform, meta, crs, output_dir, compres
             print(f"Could not compress and save PNG for {label}: {e}")
 
 try:
-    from preprocess.compressor import compress
+    from compressor import compress
     from PIL import Image
     COMPRESSOR_AVAILABLE = True
 except ImportError:
@@ -231,5 +231,6 @@ if __name__ == "__main__":
             meta,
             crs,
             output_dir,
+            'test',
             True
         )

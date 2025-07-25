@@ -44,6 +44,9 @@ def process_date(slave_date_label):
             if tif_band.endswith('.tif'):
                 source_tif_path = os.path.join(FINAL_SOURCE_FOLDER, tif_band)
                 coregistered_tif_path = os.path.join(FINAL_COREG_OUTPUT_DIR, tif_band)
+                if (os.path.exists(coregistered_tif_path)):
+                    print(f"Skipping {tif_band}, already processed.")
+                    continue
                 try:
                     my_coreg(
                         source_tif_path=source_tif_path,
@@ -63,7 +66,7 @@ if __name__ == "__main__":
 
     # List of slave dates
     SLAVE_DATE_LABELS = [date_folder for date_folder in sorted(os.listdir(cfg.DATA_DIR))]
-    SLAVE_DATE_LABELS = ['24_03_07']
+    # SLAVE_DATE_LABELS = ['24_03_07']
     print(f"Found {len(SLAVE_DATE_LABELS)} slave date folders in {cfg.DATA_DIR}")
     print(f"Slave date labels: {SLAVE_DATE_LABELS}")
 

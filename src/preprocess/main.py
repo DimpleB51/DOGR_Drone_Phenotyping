@@ -55,7 +55,7 @@ def combine_bands(folder_path):
 def output_exists(output_dir):
     cnt = 0
     for files in os.listdir(output_dir):
-        if files.endswith('.tif'):
+        if files.endswith('_VIs.tif'):
             cnt += 1
     return cnt >= cfg.NUM_OF_REGIONS
 
@@ -165,7 +165,8 @@ def main():
                                                 transform, 
                                                 meta,
                                                 crs, 
-                                                specific_output_dir, 
+                                                specific_output_dir,
+                                                'VIs', 
                                                 compress_save)
                         regBar.update(1)
             else:

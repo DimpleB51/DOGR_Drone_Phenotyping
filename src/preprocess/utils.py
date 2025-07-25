@@ -3,8 +3,7 @@ import os
 import rasterio
 from rasterio.warp import reproject, Resampling
 import matplotlib.pyplot as plt
-
-import numpy as np
+import pandas as pd
 
 def load_tif_numpy_with_meta(tiff_path):
     """
@@ -228,3 +227,66 @@ def resample_rgb_to_master_grid(master_path, # Path to master Red band for grid 
     
     except Exception as e:
         raise Exception(f"Error during resampling: {e}")
+
+def get_master_df(master_file, concat_all=False, log=True):
+    """
+    Loads data from an Excel file with multiple sheets, each representing a trial.
+
+    Can either return a dictionary of DataFrames (one per trial) or a single
+    concatenated DataFrame with all trials combined.
+
+    Args:
+        master_file (str): Path to the master Excel file.
+        concat_all (bool, optional): If True, concatenates all trial sheets into a
+                                     single DataFrame. If False, returns a dictionary
+                                     of DataFrames. Defaults to False.
+        log (bool, optional): If True, prints loading progress. Defaults to True.
+
+    Returns:
+        dict or pd.DataFrame:
+            - If concat_all is False: A dictionary where keys are trial names (e.g., 'Trial 1')
+              and values are the corresponding Pandas DataFrames.
+            - If concat_all is True: A single Pandas DataFrame containing data from
+              all trial sheets combined, with a new 'Trial_ID' column.
+    """
+    try:
+        master_sheets = pd.read_excel(master_file, sheet_name=None, dtype={'Date': str})
+    except FileNotFoundError:
+        print(f"Error: Master file not found at {master_file}")
+        return {} if not concat_all else pd.DataFrame()
+
+    MASTER_DF = {}
+    if log:
+        print(f"Reading master file: {os.path.basename(master_file)}")
+        
+    for sheet_name, sheet_df in master_sheets.items():
+        if sheet_name.lower().startswith('trial'):
+            if log:
+                print(f"    Loading {sheet_name}...")
+            # Add a 'Trial_ID' column to each sheet's DataFrame before processing
+            sheet_df['Trial_ID'] = sheet_name
+            MASTER_DF[sheet_name] = sheet_df
+
+    if log:
+        print(f"Total sheets processed: {len(MASTER_DF)}")
+
+    if concat_all:
+        if not MASTER_DF:
+            print("Warning: No trial sheets found to concatenate.")
+            return pd.DataFrame()
+        
+        # Concatenate all DataFrames in the dictionary into a single DataFrame
+        all_trials_df = pd.concat(MASTER_DF.values(), ignore_index=True)
+        if log:
+            print(f"Concatenated all trials into a single DataFrame with shape: {all_trials_df.shape}")
+        return all_trials_df
+    else:
+        # Return the dictionary of DataFrames
+        return MASTER_DF
+
+def save_master_df(master_df, output_file):
+    import pandas as pd
+    with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
+        for sheet_name, df in master_df.items():
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
+    print(f"Master DataFrame saved to {output_file}")
