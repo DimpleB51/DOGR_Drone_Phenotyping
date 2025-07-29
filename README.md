@@ -1,4 +1,4 @@
-# 1_weather_master_sheet generates weather master excel sheet
+# weather_master_sheet generates weather master excel sheet
 2 files are required to generate this code **Jan-Sept_2024_Weather_data.xlsx** and **weather.csv** these are the excel sheets from the weather station
 ### CODE to generate weather data in blocks (Trial_wise)
 Blocks are <br/>
@@ -62,7 +62,7 @@ EDA_weather-Correlation-noblocks.ipynb
 ```
 displays pearson correlation between weather parameters and diseases.
 
-### Just looking at rainfall
+# Just looking at rainfall
 ```
 EDA_weather_noblocks-rain.ipynb
 ```
