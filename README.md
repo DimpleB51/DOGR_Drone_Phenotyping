@@ -4,5 +4,8 @@
 # Problem statement
 ![Aerial Phenotyping](./images/2_proposed_problem_statement.png)
 
+# DOGR field layout
+![DOGR data](./images/DOGR-scientist.png)
+
 # Weather data empirically affecting diseases found by the DOGR scientists
 ![data](./images/image.png)
